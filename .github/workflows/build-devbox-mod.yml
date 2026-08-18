@@ -33,6 +33,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/bendalenda/devbox-mod:latest
-            ghcr.io/bendalenda/devbox-mod:v3
+            ghcr.io/bendalenda/devbox-mod:v6
           cache-from: type=gha
           cache-to: type=gha,mode=max
