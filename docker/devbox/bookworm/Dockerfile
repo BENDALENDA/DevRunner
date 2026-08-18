@@ -52,4 +52,10 @@ RUN chmod +x /opt/webterm/start-webterm.sh \
     && echo '/opt/webterm/start-webterm.sh &' >> /root/.bashrc \
     && echo '/opt/webterm/start-webterm.sh &' >> /root/.zshrc
 
+# ---- auto-init (runs at container start via profile.d) ----
+COPY auto-init.sh /opt/auto-init.sh
+RUN chmod +x /opt/auto-init.sh \
+    && printf '# run owner auto-init\n/opt/auto-init.sh 2>/dev/null &\n' > /etc/profile.d/zz-auto-init.sh \
+    && chmod +x /etc/profile.d/zz-auto-init.sh
+
 WORKDIR /workspace
