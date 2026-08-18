@@ -1,0 +1,28 @@
+import express from 'express';
+import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+import { spawn } from 'node-pty';
+import { WebSocketServer, WebSocket } from 'ws';
+import os from 'node:os';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PORT = process.env.PORT || 3002;
+const ROOT = path.resolve(process.env.FS_ROOT || '/workspace');
+const app = express();
+const server = http.createServer(app);
+app.use(express.json({ limit: '50mb' }));
+app.get('/api/status', (req,res)=> res.json({ok:true, app:'webterm-fm-v5', root:ROOT}));
+app.get('/api/fs', (req,res)=>{ try{ const es=fs.readdirSync(ROOT,{withFileTypes:true}); res.json({root:ROOT, items:es.map(e=>e.name)});}catch(e){res.status(500).json({error:e.message});} });
+const wss = new WebSocketServer({ noServer:true });
+server.on('upgrade', (req,sock,head)=>{ if(req.url.startsWith('/api/terminal/ws')) wss.handleUpgrade(req,sock,head,ws=>wss.emit('connection',ws,req)); else sock.destroy(); });
+wss.on('connection', ws => {
+  const pty = spawn('/bin/bash', [], { name:'xterm-256color', cols:100, rows:30, cwd:ROOT, env:{...process.env, TERM:'xterm-256color'} });
+  ws.send(JSON.stringify({type:'session', shell:pty.process, cwd:ROOT}));
+  pty.onData(d => { if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'output', data:d})); });
+  pty.onExit(()=>{ try{ws.close();}catch{} });
+  ws.on('message', raw => { try{ const m=JSON.parse(raw); if(m.type==='input') pty.write(m.data); }catch{ pty.write(raw.toString()); } });
+  ws.on('close', ()=>{ try{pty.kill();}catch{} });
+});
+app.get('/{*splat}', (req,res)=> res.send('<h1>webterm-fm-v5</h1>'));
+server.listen(PORT, ()=> console.log('listening '+PORT));
